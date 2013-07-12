@@ -1,0 +1,6 @@
+[submodule "include/DirectoryWalker"]
+	path = include/DirectoryWalker
+	url = https://github.com/jrfnl/DirectoryWalker
+[submodule "include/php-token-stream"]
+	path = include/php-token-stream
+	url = https://github.com/jrfnl/php-token-stream
