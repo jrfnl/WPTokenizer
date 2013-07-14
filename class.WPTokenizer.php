@@ -127,28 +127,28 @@ pr_var( $tokens->getClasses(), 'functions', true );*/
 		 * @todo	Also: for theme's this information is contained in style.css! Figure out a way to deal with that.
  Plugin
 
-    Author (Plugin)
-    Author URI (Plugin)
-    Description (Plugin)
-    Domain Path (Plugin)
-    Network (Plugin)
-    Plugin Name (Plugin)
-    Plugin URI (Plugin)
-    Site Wide Only (Plugin; deprecated in favor of Network)
-    Text Domain (Plugin)
-    Version (Plugin) 
+	Author (Plugin)
+	Author URI (Plugin)
+	Description (Plugin)
+	Domain Path (Plugin)
+	Network (Plugin)
+	Plugin Name (Plugin)
+	Plugin URI (Plugin)
+	Site Wide Only (Plugin; deprecated in favor of Network)
+	Text Domain (Plugin)
+	Version (Plugin)
 
 Theme
 
-    Author (Theme)
-    Author URI (Theme)
-    Description (Theme)
-    Status (Theme)
-    Tags (Theme)
-    Template (Theme)
-    Theme Name (Theme)
-    Theme URI (Theme)
-    Version (Theme)
+	Author (Theme)
+	Author URI (Theme)
+	Description (Theme)
+	Status (Theme)
+	Tags (Theme)
+	Template (Theme)
+	Theme Name (Theme)
+	Theme URI (Theme)
+	Version (Theme)
 		 *
 		 * @param	array			$tokens
 		 * @param	string|null		$name
@@ -165,7 +165,7 @@ Theme
 					break;
 				}
 
-				// We have a comment - check to see if we can parse the plugin name based on the WP readme standard
+				// We have a comment - check to see if we can parse the plugin name based on the WP PHP header file standard
 				if ( $token instanceof PHP_Token_DOC_COMMENT ||
 					$token instanceof PHP_Token_COMMENT ) {
 					if ( preg_match( '`[\s\*]+Plugin Name: ([^\n\r]+)[\n\r]`', $token->__toString(), $matches ) ) {
@@ -202,7 +202,8 @@ Theme
 			}
 
 			if ( is_string( $values ) ) {
-				$values = array( $values );
+				$values = explode( ',', $values );
+				$values = array_map( 'trim', $values );
 			}
 
 			$filtered_tokens = array();
@@ -229,7 +230,8 @@ Theme
 
 			// Make $types usable
 			if ( is_string( $types ) ) {
-				$types = array( $types );
+				$types = explode( ',', $types );
+				$types = array_map( 'trim', $types );
 			}
 
 			foreach ( $types as $k => $type ) {
@@ -310,19 +312,19 @@ Theme
 
 			$return = false;
 
-			$line = $tokens[$key]->getLine();
+			$line      = $tokens[$key]->getLine();
 			$functions = $tokens->getFunctions();
 
 			if ( is_array( $functions ) && count( $functions ) > 0 ) {
 				foreach ( $functions as $name => $details ) {
 					if ( $line >= $details['startLine'] && $line <= $details['endLine'] ) {
 						$details['name'] = $name;
-						$return = $details;
+						$return          = $details;
 						break;
 					}
 				}
+				unset( $name, $details );
 			}
-
 			return $return;
 		}
 /*
@@ -356,6 +358,7 @@ Theme
 						$return = $this->is_within_method( $tokens, $key, $the_type );
 					}
 				}
+				unset( $the_type );
 			}
 			else {
 				$line = $tokens[$key]->getLine();
@@ -374,12 +377,9 @@ Theme
 				}
 
 				if ( is_array( $set ) && count( $set ) > 0 ) {
-
 					foreach ( $set as $class => $set_details ) {
-
 						if ( ( $line >= $set_details['startLine'] && $line <= $set_details['endLine'] ) &&
 							( is_array( $set_details['methods'] ) && count( $set_details['methods'] ) > 0 ) ) {
-
 							foreach ( $set_details['methods'] as $name => $details ) {
 								if ( $line >= $details['startLine'] && $line <= $details['endLine'] ) {
 									$details['type']        = $type;
@@ -389,8 +389,10 @@ Theme
 									break 2; // Stop the outer foreach
 								}
 							}
+							unset( $name, $details );
 						}
 					}
+					unset( $class, $set_details );
 				}
 			}
 
@@ -399,7 +401,7 @@ Theme
 /*
 [type (string)] => (string) ‘class’
 [name (string)] => (string) ‘mimetypes_link_icons’
-[methode_name (string)] => (string) ‘init_statics’
+[method_name (string)] => (string) ‘init_statics’
 [docblock (string)] => string[237] : ‘/** * Set the static path and directory variables for this class * Is called from the global space *before* instantiating the class to make * sure the correct values are available to the object * * @return void * /’
 [keywords (string)] => string[6] : ‘static’
 [visibility (string)] => string[6] : ‘public’
@@ -408,6 +410,7 @@ Theme
 [endLine (string)] => int : 380
 [ccn (string)] => int : 3
 [file (string)] => string[60] : ‘I:\000_GitHub\MimeTypes-Link-Icons\mime_type_link_images.php’
+
 
 
 To be determined if I should add any of the below (class level, i.e. $set_details[]):
@@ -433,51 +436,120 @@ link_images.php’
 
 
 		/**
-		 * Get nearest comment above the current line
+		 * Get nearest relevant comment above the current line
 		 *
-		 * Will stop searching if it reaches the start of the calling function, though it *will*
-		 * check the docblock above the calling function.
+		 * First checks directly above the line, if no comment is found there and the line is
+		 * part of a function or method call, it will look for the docblock for the function/method.
 		 *
-		 * If $break_at is defined, it will stop searching if it comes across a string contained in the $break_at array to avoid ambiguity in interpreting the comment at the top of the function.
-		 * If $tag is defined, it will only return the nearest comment (using above definition) if it contains
-		 * the requested tag.
-		 * @todo deal with break_at
-		 * @todo deal with tag
-		 *
-		 * @todo figure out a way to deal with multi-line non-DocBlock comments
-		 *
+		 * If $break_at is defined, it will disregard the docblock for the function/method if it comes
+		 * across a string contained in the $break_at array (between the start of the function and the
+		 * line in question) to avoid ambiguity in interpreting the comment at the top of the function.
 		 *
 		 * @param	array			$tokens		Array of token objects
 		 * @param	int				$key		Key of the token for which we're trying to get the comment
 		 * @param	array|string	$break_at	String or array of strings at which to break off the search
-		 * @param	array|string	$must_have_tag		phpDoc tag string or array of phpDoc strings to search for in the comment
 		 * @return	string
 		 */
-		public function get_nearest_comment( $tokens, $key, $break_at = null, $must_have_tag = null ) {
+		public function get_comment_above_line( $tokens, $key ) {
 
-			if ( isset( $break_at ) && !is_array( $break_at ) ) {
-				$break_at = (array) $break_at;
-			}
-			if ( isset( $tag ) && !is_array( $tag ) ) {
-				$tag = array( $tag );
-			}
+			$current_line_number = $tokens[$key]->getLine();
 
+			$comment = null;
 
-
-
-//			$tokens            = $this->tokens();
-//pr_var( $tokens );
-//pr_var( $key, 'key', true );
-			$currentLineNumber = $tokens[$key]->getLine();
-			$prevLineNumber    = $currentLineNumber - 1;
-
-			//$within_function = $this->is_within_function( $tokens, $key );
-			//$within_method = $this->is_within_method( $tokens, $key );
-
-			for ( $i = $key - 1; $i; $i-- ) {
+			for ( $i = $key - 1; $i ; $i-- ) {
 				if ( !isset( $tokens[$i] ) ) {
-					return;
+					break; // if not set, there will be nothing more before this either
 				}
+				
+				if ( $tokens[$i] instanceof PHP_Token_FUNCTION ||
+					$tokens[$i] instanceof PHP_Token_CLASS ||
+					$tokens[$i] instanceof PHP_Token_TRAIT ) {
+					// Some other trait, class or function, no docblock can be
+					// used for the current token
+//print 'breaking because of function | class | trait<br>';
+					break;
+				}
+
+				$line = $tokens[$i]->getLine();
+
+				if ( $line === $current_line_number ||
+					( $line <= ( $current_line_number - 1 ) && $tokens[$i] instanceof PHP_Token_WHITESPACE ) ) {
+//print 'continue because of same line or prev line, but whitespace<br>';
+					continue;
+				}
+				
+				if ( $line < $current_line_number &&
+					( !$tokens[$i] instanceof PHP_Token_DOC_COMMENT &&
+					!$tokens[$i] instanceof PHP_Token_COMMENT ) ) {
+//print 'breaking because doc comment found<br>';
+					break;
+				}
+				
+				else {
+					$comment[] = $tokens[$i]->__toString();
+					// comment found
+				}
+
+				// ignore everything on the same line - should this just be < ?
+/*				if ( $tokens[$i]->getLine() !== $current_line_number ) {
+
+					// We're trying to get a comment just above the line
+
+					if ( $tokens[$i] instanceof PHP_Token_DOC_COMMENT || $tokens[$i] instanceof PHP_Token_COMMENT ) {
+						//verify there is nothing else on the same line
+						$comment_line_number = $tokens[$i]->getLine();
+
+/*							for ( $j = $i - 1; $j > $min_line_number; $j-- ) {
+							if ( $comment_line_number !== $tokens[$j]->getLine() ) {
+								$comment[] = $tokens[$i]->toString(); // capture the comment ?
+								break 1;
+							}
+							else if ( 1 === 1 /*is whitespace or comment* / ) {
+							}
+						}* /
+						//only if there isn't, capture the comment
+						$comment[] = $tokens[$i]->__toString(); // capture the comment ?
+							// change current line to this one and see if there is another comment line above this one
+					}
+					else if ( $tokens[$i] instanceof PHP_Token_WHITESPACE ) {
+						continue;
+					}
+					else if ( !isset( $comment ) && ( $function !== false || $method !== false ) ) {
+						//ok, no comment found directly above the line
+						if ( $function !== false && ( is_string( $function['docblock'] ) && $function['docblock'] !== '' ) ) {
+							$docblock = $function['docblock'];
+						}
+						if ( $method !== false && ( is_string( $method['docblock'] ) && $method['docblock'] !== '' ) ) {
+							$docblock = $method['docblock'];
+						}
+
+
+						if ( isset( $docblock ) && isset( $break_at ) ) {
+							// No need to look for break at strings if there is no docblock
+							// or if the break at strings are not defined...
+
+							$search_to_top = true;
+						}
+						else {
+							// no need to look further, we may have a docblock though
+							break;
+						}
+					}
+					else {
+						// not in a function or method and not comment or whitespace, so let's break this off
+						break;
+					}
+				}*/
+			}
+
+			if ( isset( $comment ) && is_array( $comment ) && count( $comment ) > 0 ) {
+				$comment = array_reverse( $comment );
+				$comment = implode( "\n\r", $comment );
+				return $comment;
+			}
+			else {
+				return false;
+			}
 
 				// Isset ?
 				// is not in break_at array ?
@@ -493,14 +565,6 @@ link_images.php’
 
 
 
-
-
-				if ( isset( $break_at ) && in_array( $tokens[$i]->__toString(), $break_at ) ) {
-					// Token in break at array, break off searching
-					return;
-				}
-
-
 /*
 $parsed_comment = $this->parse_comment( $tokens[$i]->__toString() );
 if ( ( is_array( $parsed_comment ) && count( $parsed_comment ) === 1 ) && ( array_key_exist( 'internal', $parsed_comment ) || array_key_exists( 'ignore', $parsed_comment ) ) {
@@ -514,7 +578,7 @@ else {
 */
 
 //pr_var( array( 'class' => get_class( $tokens[$i] ), 'line' => $tokens[$i]->getLine(), 'string' => $tokens[$i]->__toString() ), '$tokens['.$i. ']', true );
-				if ( $tokens[$i] instanceof PHP_Token_FUNCTION ||
+/*				if ( $tokens[$i] instanceof PHP_Token_FUNCTION ||
 					$tokens[$i] instanceof PHP_Token_CLASS ||
 					$tokens[$i] instanceof PHP_Token_TRAIT ) {
 					// Some other trait, class or function, no docblock can be
@@ -544,26 +608,126 @@ else {
 				return (string) $tokens[$i];
 			}
 
-			return;
+			return;*/
+		}
+		
+		
+		public function get_nearest_function_docblock( $tokens, $key ) {
+			
+			$function = $this->is_within_function( $tokens, $key );
+
+			if ( $function !== false && isset( $function['docblock'] ) ) {
+				return $function['docblock'];
+			}
+			else {
+				$method = $this->is_within_method( $tokens, $key );
+				if ( $method !== false && isset( $method['docblock'] ) ) {
+					return $method['docblock'];
+				}
+			}
+			return null;
+		}
+		
+		
+		/**
+		 *
+		 *
+		 *
+		 * @return bool|null	boolean indication of whether docblock is ambiguous or null if
+		 *						$break_at does not contain valid value(s)
+		 */
+		public function is_docblock_ambiguous( $tokens, $key, $break_at ) {
+
+			// Make sure $break_at is usable
+			if ( isset( $break_at ) && ( is_string( $break_at ) && $break_at !== '' ) ) {
+				$break_at = explode( ',', $break_at );
+				$break_at = array_map( 'trim', $break_at );
+			}
+
+			$ambiguous = null;
+
+			if ( isset( $break_at ) && ( is_array( $break_at ) && count( $break_at ) > 0 ) ) {
+
+				// Is the token at $key part of a function or method ?
+				$min_line_number = 0;
+				$function        = $this->is_within_function( $tokens, $key );
+				$method          = false;
+
+				if ( $function !== false && isset( $function['startLine'] ) ) {
+					$min_line_number = $function['startLine'];
+				}
+				else {
+					$method = $this->is_within_method( $tokens, $key );
+					if ( $method !== false && isset( $method['startLine'] ) ) {
+						$min_line_number = $method['startLine'];
+					}
+				}
+//$this->print_to_table_helper( $tokens, $min_line_number, $key );
+				if( $function !== false || $method !== false ) {
+
+					for ( $i = ( $key - 1 ); $tokens[$i]->getLine() >= $min_line_number; $i-- ) {
+
+						if ( !isset( $tokens[$i] ) ) {
+							$ambiguous = false;
+//print '<span style="font-weight: bold; color: purple;">not ambiguous - token ' . $i . 'not set</span><br />';
+							break; // if not set, there will be nothing more before this either
+						}
+
+						if ( isset( $break_at ) && in_array( $tokens[$i]->__toString(), $break_at ) ) {
+							// ok, encountered an ambiguous tag
+							$ambiguous = true;
+//print '<span style="font-weight: bold; color: purple;">ambiguous - token "' . $tokens[$i]->__toString() . '" in_array break_at</span><br />';
+							break;
+						}
+					}
+				}
+				else {
+					// not part of function or method, so always ambiguous.
+//print '<span style="font-weight: bold; color: purple;">ambiguous - not part of function or method</span><br />';
+					$ambiguous = true;
+				}
+			}
+			return $ambiguous;
 		}
 
-
-
+		
+		public function get_parsed_nearest_relevant_comment( $tokens, $key, $break_at, $tags, $not, $hookname ) {
+//print str_pad( '<span style="font-weight: bold; color: blue;">' . $hookname . '</span> ', 150, '=' );
+			$parsed  = null;
+			$comment = $this->get_comment_above_line( $tokens, $key );
+//pr_var( $comment, 'comment from above line', true );
+			if( isset( $comment ) && $comment !== '' ) {
+				$parsed = $this->parse_comment( $comment, $tags, $not );
+			}
+//pr_var( $parsed, 'parsed comment from above line', true );
+			if( !isset( $parsed ) || $parsed === false ) {
+				$docblock = $this->get_nearest_function_docblock( $tokens, $key );
+//pr_var( $docblock, 'function docblock', true );
+				$ambiguous = $this->is_docblock_ambiguous( $tokens, $key, $break_at );
+//pr_var( $ambiguous, 'docblock ambiguous ?', true );
+				if( !isset( $ambiguous ) || $ambiguous === false ) {
+					$parsed = $this->parse_comment( $docblock, $tags, $not );
+//pr_var( $parsed, 'parsed comment from docblock', true );
+				}
+			}
+			return $parsed;
+		}
 
 
 
 		/**
 		 * Retrieve the nearest comment and parse it as a phpDoc style comment
 		 *
-		 * @param $tokens
-		 * @param $key
-		 * @param null $tag
-		 * @return array
+		 * @param   array              $tokens
+		 * @param   int                $key
+		 * @param   array|string|null  $tags
+		 * @param   array|string|null  $not
+		 * @return  array
 		 */
-		public function parse_nearest_comment( $tokens, $key, $tag = null ) {
-			return $this->parse_comment( $this->get_nearest_comment( $tokens, $key, $tag ), $tag );
+/*		public function parse_nearest_comment( $tokens, $key, $tags = null, $not = null ) {
+			return $this->parse_comment( $this->get_nearest_comment( $tokens, $key ), $tags, $not );
 		}
-
+*/
 
 		/**
 		 * @todo Have a really good look at this function !!!
@@ -579,7 +743,7 @@ else {
 
 
 		/**
-		 * Parse comments to their individual parts
+		 * Parse a comment to it's individual parts
 		 *
 		 * Superfluous whitespace will be removed from the resulting values
 		 * Note: new lines are *not* removed from values, other superfluous whitespace is.
@@ -588,12 +752,14 @@ else {
 		 *
 		 * @todo may be figure out a way to deal with {inline @link} comments ? Probably not needed
 		 *
-		 * @param	string			$string		Comment string
-		 * @param	array|string	$tags		a phpDoc tags or an array of phpDocs tags to filter for
-		 * @return	array			Array containing the parsed comment, optionally filtered to only
-		 *							contain instances of $tag
+		 * @param	string				$string		Comment string
+		 * @param	array|string|null	$tags		a phpDoc tag or an array of phpDocs tags to filter
+		 *											for (remove all else )
+		 * @param	array|string|null	$not		a phpDoc tag or an array of phpDocs tags to filter
+		 * 											out (remove from the result )
+		 * @return	array|false			Array containing the filtered parsed comment parts
 		 */
-		public function parse_comment( $string, $tags = null ) {
+		public function parse_comment( $string, $tags = null, $not = array( 'ignore', 'internal' ) ) {
 
 //			static $search = array( '`(?:^(/\*+)|(\*/)$|[\n\r][ \t]+(\*)[\s]|^(//)|^(#))`', '`([ \t\r]{2,})`' );
 /*			static $replace = array( '', ' ' );
@@ -617,28 +783,38 @@ else {
 						// No @tag found, tag it as 'description'
 						$comment['description'][] = $match[2];
 					}
-					else if ( $match[2] !== '' ) {
+					else if ( $match[1] !== '' && $match[2] !== '' ) {
 						$parsed_line = $this->comment_parse_line( $match[2], $match[1] );
 						if ( $parsed_line !== false ) {
 							$comment[$match[1]][] = $parsed_line;
 						}
 					}
-					else {
+					else if ( $match[1] !== '' ) {
 						$comment[$match[1]][] = '';
 					}
 				}
 				unset( $match );
 
 
-				if ( ! isset( $tags ) || ( ( !is_string( $tags ) && !is_array( $tags ) ) || ( ( is_string( $tags ) && $tags === '' ) || ( is_array( $tags ) && count( $tags ) === 0 ) ) ) ) {
-					return $comment;
-				}
-				else {
+				if ( isset( $tags ) && ( ( is_string( $tags ) && $tags === '' ) || ( is_array( $tags ) && count( $tags ) > 0 ) ) ) {
 					if ( is_string( $tags ) ) {
-						$tags = array( $tags );
+						$tags = explode( ',', $tags );
+						$tags = array_map( 'trim', $tags );
 					}
-					$tags = array_flip( $tags );
-					return array_intersect_key( $comment, $tags );
+					$tags    = array_flip( $tags );
+					$comment = array_intersect_key( $comment, $tags );
+				}
+				if ( isset( $not ) && ( ( is_string( $not ) && $not === '' ) || ( is_array( $not ) && count( $not ) > 0 ) ) ) {
+					if ( is_string( $not ) ) {
+						$not = explode( ',', $not );
+						$not = array_map( 'trim', $not );
+					}
+					$not     = array_flip( $not );
+					$comment = array_diff_key( $comment, $not );
+				}
+				// Only return the array if there is anything left of it after the filter actions, otherwise default to false at the end
+				if ( count( $comment ) > 0 ) {
+					return $comment;
 				}
 			}
 			return false;
