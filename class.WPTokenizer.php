@@ -23,7 +23,6 @@
  * @todo Work out nearest comment code for Docblock above function definition
  *
  */
-
 if ( !class_exists( 'WPTokenizer' ) ) {
 	/**
 	 * WP Tokenizer
@@ -45,6 +44,14 @@ if ( !class_exists( 'WPTokenizer' ) ) {
 		 */
 		const VERSION = '1.0';
 
+		/**
+		 * @var		array	$not		Which comment tags to remove from parse comment results
+		 */
+		protected $default_not = array(
+			'internal',
+			'ignore',
+		);
+
 
 		/**
 		 * @var		array	$extensions		Which file extensions to look for
@@ -61,44 +68,64 @@ if ( !class_exists( 'WPTokenizer' ) ) {
 
 		/**
 		 * Constructor.
+		 * If $path is given, will initialize & fill the directory and token caches
 		 *
-		 * @param	string	$path		Plugin/Theme path
+		 * @param	string|null	$path		Plugin/Theme path
 		 */
-		public function __construct( $path ) {
+		public function __construct( $path = null ) {
 
-			$file_list = $this->get_files( $path, true, $this->extensions );
+			if ( !is_null( $path ) ) {
+				$file_list = $this->get_files( $path, true, $this->extensions );
 
-			$slash = ( strrchr( $path, DIRECTORY_SEPARATOR ) === DIRECTORY_SEPARATOR ? '' : DIRECTORY_SEPARATOR );
+				$slash = ( strrchr( $path, DIRECTORY_SEPARATOR ) === DIRECTORY_SEPARATOR ? '' : DIRECTORY_SEPARATOR );
 
-			require_once 'include/php-token-stream/PHP/Token/Stream/Autoload.php';
+				// Initialize & cache all the token streams
+				foreach ( $file_list as $file_name ) {
+					$tokens = $this->get_tokens( $path . $slash . $file_name );
 
-			// Initialize & cache all the token streams
-			foreach ( $file_list as $file_name ) {
-				$tokens = PHP_Token_Stream_CachingFactory::get( $path . $slash . $file_name );
+					/* Save some data we'll always need */
 
-				/* Save some data we'll always need */
-
-				// Only look for plugin name in top-level files
-				if ( strpos( $file_name, DIRECTORY_SEPARATOR ) === false ) {
-					$this->plugin_name = $this->get_plugin_name( $tokens, $this->plugin_name );
+					// Only look for plugin name in top-level files
+					if ( strpos( $file_name, DIRECTORY_SEPARATOR ) === false ) {
+						$this->plugin_name = $this->get_plugin_name( $tokens, $this->plugin_name );
+					}
 				}
+			}
+		}
 
-/*$this->print_to_table_helper( $tokens, 510, 437 );
-pr_var( $tokens->getFunctions(), 'functions', true );
-pr_var( $tokens->getClasses(), 'functions', true );*/
+
+		/**
+		 * Change the value of the protected $default_not property which determines which
+		 * comment properties to exclude from being returned in a parsed comment.
+		 *
+		 * @param   array|string|null    $not
+		 * @return  bool                 Whether the property was changed
+		 */
+		public function set_not( $not ) {
+			if( !isset( $not ) ) {
+				$this->default_not = null;
+			}
+			if ( is_string( $not ) && $not !== '' ) {
+				$not = explode( ',', $not );
+				$not = array_map( 'trim', $not );
 			}
 
-//exit;
-
+			if ( is_array( $not ) && count( $not ) > 0 ) {
+				$this->default_not = $not;
+				return true;
+			}
+			else {
+				return false;
+			}
 		}
 
 
 		/**
 		 * Retrieve the (cached) file list for path
 		 *
-		 * @param	string			$path
-		 * @param	bool			$recursive
-		 * @param	array|string	$exts
+		 * @param	string			$path       Directory path
+		 * @param	bool			$recursive  Defaults to true
+		 * @param	array|string	$exts       Defaults to null (=don't filter on exts)
 		 * @return	array			File list
 		 */
 		public function get_files( $path, $recursive = true, $exts = null ) {
@@ -112,10 +139,13 @@ pr_var( $tokens->getClasses(), 'functions', true );*/
 		/**
 		 * Retrieve the (cached) tokens object
 		 *
-		 * @param	string	$path_to_file
+		 * @param	string	$path_to_file       Path to file
 		 * @return	object
 		 */
 		public function get_tokens( $path_to_file ) {
+			if( !function_exists( 'PHP_TokenStream_Autoload' ) ) {
+				require_once 'include/php-token-stream/PHP/Token/Stream/Autoload.php';
+			}
 			return PHP_Token_Stream_CachingFactory::get( $path_to_file );
 		}
 
@@ -150,7 +180,7 @@ Theme
 	Theme URI (Theme)
 	Version (Theme)
 		 *
-		 * @param	array			$tokens
+		 * @param	object	$tokens		Array of token objects
 		 * @param	string|null		$name
 		 * @return	string|null
 		 */
@@ -179,7 +209,7 @@ Theme
 
 
 		/**
-		 * @param $tokens
+		 * @param	array	$tokens		Array of token objects
 		 * @param $values
 		 * @param $types
 		 * @return array
@@ -191,7 +221,7 @@ Theme
 
 
 		/**
-		 * @param $tokens
+		 * @param	array	$tokens		Array of token objects
 		 * @param $values
 		 * @return array|bool
 		 */
@@ -217,7 +247,7 @@ Theme
 
 
 		/**
-		 * @param $tokens
+		 * @param	array	$tokens		Array of token objects
 		 * @param $types
 		 * @return array
 		 */
@@ -256,7 +286,7 @@ Theme
 		/**
 		 * Get the signature of a function call rather than of a function definition
 		 *
-		 * @param $tokens
+		 * @param	array	$tokens		Array of token objects
 		 * @param $token
 		 * @param $key
 		 * @return mixed
@@ -271,7 +301,7 @@ Theme
 		/**
 		 * Get the arguments of a function call rather than for a function definition
 		 *
-		 * @param $tokens
+		 * @param	array	$tokens		Array of token objects
 		 * @param $token
 		 * @param $key
 		 * @return array
@@ -287,7 +317,7 @@ Theme
 		/**
 		 * Get the DocBlock directly above a line (if any)
 		 *
-		 * @param $tokens
+		 * @param	array	$tokens		Array of token objects
 		 * @param $token
 		 * @param $key
 		 * @return null|string
@@ -318,7 +348,7 @@ Theme
 			if ( is_array( $functions ) && count( $functions ) > 0 ) {
 				foreach ( $functions as $name => $details ) {
 					if ( $line >= $details['startLine'] && $line <= $details['endLine'] ) {
-						$details['name'] = $name;
+						$details['function_name'] = $name;
 						$return          = $details;
 						break;
 					}
@@ -383,7 +413,7 @@ Theme
 							foreach ( $set_details['methods'] as $name => $details ) {
 								if ( $line >= $details['startLine'] && $line <= $details['endLine'] ) {
 									$details['type']        = $type;
-									$details['name']        = $class;
+									$details['class_name']  = $class;
 									$details['method_name'] = $name;
 									$return                 = $details;
 									break 2; // Stop the outer foreach
@@ -447,7 +477,6 @@ link_images.php’
 		 *
 		 * @param	array			$tokens		Array of token objects
 		 * @param	int				$key		Key of the token for which we're trying to get the comment
-		 * @param	array|string	$break_at	String or array of strings at which to break off the search
 		 * @return	string
 		 */
 		public function get_comment_above_line( $tokens, $key ) {
@@ -610,9 +639,14 @@ else {
 
 			return;*/
 		}
-		
-		
-		public function get_nearest_function_docblock( $tokens, $key ) {
+
+
+		/**
+		 * @param $tokens
+		 * @param $key
+		 *
+		 * @return null
+		 */public function get_nearest_function_docblock( $tokens, $key ) {
 			
 			$function = $this->is_within_function( $tokens, $key );
 
@@ -627,14 +661,18 @@ else {
 			}
 			return null;
 		}
-		
-		
+
+
 		/**
 		 *
 		 *
 		 *
-		 * @return bool|null	boolean indication of whether docblock is ambiguous or null if
-		 *						$break_at does not contain valid value(s)
+		 * @param $tokens
+		 * @param $key
+		 * @param $break_at
+		 *
+		 * @return bool|null    boolean indication of whether docblock is ambiguous or null if
+		 *                        $break_at does not contain valid value(s)
 		 */
 		public function is_docblock_ambiguous( $tokens, $key, $break_at ) {
 
@@ -663,7 +701,7 @@ else {
 					}
 				}
 //$this->print_to_table_helper( $tokens, $min_line_number, $key );
-				if( $function !== false || $method !== false ) {
+				if ( $function !== false || $method !== false ) {
 
 					for ( $i = ( $key - 1 ); $tokens[$i]->getLine() >= $min_line_number; $i-- ) {
 
@@ -690,22 +728,31 @@ else {
 			return $ambiguous;
 		}
 
-		
-		public function get_parsed_nearest_relevant_comment( $tokens, $key, $break_at, $tags, $not, $hookname ) {
-//print str_pad( '<span style="font-weight: bold; color: blue;">' . $hookname . '</span> ', 150, '=' );
+
+		/**
+		 * @param $tokens
+		 * @param $key
+		 * @param $break_at
+		 * @param $tags
+		 * @param $not
+		 *
+		 * @return array|false|null
+		 */
+		public function get_parsed_nearest_relevant_comment( $tokens, $key, $break_at, $tags, $not/*, $hook_name*/ ) {
+//print str_pad( '<span style="font-weight: bold; color: blue;">' . $hook_name . '</span> ', 150, '=' );
 			$parsed  = null;
 			$comment = $this->get_comment_above_line( $tokens, $key );
 //pr_var( $comment, 'comment from above line', true );
-			if( isset( $comment ) && $comment !== '' ) {
+			if ( isset( $comment ) && $comment !== '' ) {
 				$parsed = $this->parse_comment( $comment, $tags, $not );
 			}
 //pr_var( $parsed, 'parsed comment from above line', true );
-			if( !isset( $parsed ) || $parsed === false ) {
+			if ( !isset( $parsed ) || $parsed === false ) {
 				$docblock = $this->get_nearest_function_docblock( $tokens, $key );
 //pr_var( $docblock, 'function docblock', true );
 				$ambiguous = $this->is_docblock_ambiguous( $tokens, $key, $break_at );
 //pr_var( $ambiguous, 'docblock ambiguous ?', true );
-				if( !isset( $ambiguous ) || $ambiguous === false ) {
+				if ( !isset( $ambiguous ) || $ambiguous === false ) {
 					$parsed = $this->parse_comment( $docblock, $tags, $not );
 //pr_var( $parsed, 'parsed comment from docblock', true );
 				}
@@ -753,13 +800,14 @@ else {
 		 * @todo may be figure out a way to deal with {inline @link} comments ? Probably not needed
 		 *
 		 * @param	string				$string		Comment string
-		 * @param	array|string|null	$tags		a phpDoc tag or an array of phpDocs tags to filter
+		 * @param	array|string|null	$tags		[optional] A phpDoc tag or an array of phpDocs tags to filter
 		 *											for (remove all else )
-		 * @param	array|string|null	$not		a phpDoc tag or an array of phpDocs tags to filter
+		 * @param	array|string|null	$not		[optional] A phpDoc tag or an array of phpDocs tags to filter
 		 * 											out (remove from the result )
+		 *                                          If this parameter is not set, the default will be used
 		 * @return	array|false			Array containing the filtered parsed comment parts
 		 */
-		public function parse_comment( $string, $tags = null, $not = array( 'ignore', 'internal' ) ) {
+		public function parse_comment( $string, $tags = null, $not = null ) {
 
 //			static $search = array( '`(?:^(/\*+)|(\*/)$|[\n\r][ \t]+(\*)[\s]|^(//)|^(#))`', '`([ \t\r]{2,})`' );
 /*			static $replace = array( '', ' ' );
@@ -796,7 +844,8 @@ else {
 				unset( $match );
 
 
-				if ( isset( $tags ) && ( ( is_string( $tags ) && $tags === '' ) || ( is_array( $tags ) && count( $tags ) > 0 ) ) ) {
+				// Filter the results to only contain specific tags
+				if ( isset( $tags ) && ( ( is_string( $tags ) && $tags !== '' ) || ( is_array( $tags ) && count( $tags ) > 0 ) ) ) {
 					if ( is_string( $tags ) ) {
 						$tags = explode( ',', $tags );
 						$tags = array_map( 'trim', $tags );
@@ -804,14 +853,22 @@ else {
 					$tags    = array_flip( $tags );
 					$comment = array_intersect_key( $comment, $tags );
 				}
-				if ( isset( $not ) && ( ( is_string( $not ) && $not === '' ) || ( is_array( $not ) && count( $not ) > 0 ) ) ) {
+
+				// Filter the results and remove the tags to be excluded
+				if ( isset( $not ) && ( is_string( $not ) && $not !== '' ) ) {
 					if ( is_string( $not ) ) {
 						$not = explode( ',', $not );
 						$not = array_map( 'trim', $not );
 					}
-					$not     = array_flip( $not );
-					$comment = array_diff_key( $comment, $not );
 				}
+				if ( !isset( $not ) ||  ( !is_array( $not ) || count( $not ) === 0 ) ) {
+					$not = $this->default_not;
+				}
+				$not     = array_flip( $not );
+				$comment = array_diff_key( $comment, $not );
+
+
+
 				// Only return the array if there is anything left of it after the filter actions, otherwise default to false at the end
 				if ( count( $comment ) > 0 ) {
 					return $comment;
@@ -984,16 +1041,18 @@ else {
 		 * @param $start_position
 		 * @param $end_position
 		 */
-		function print_to_table_helper( $tokens, $start_position, $end_position ) {
+		function print_to_table_helper( $tokens, $start_position = null, $end_position = null ) {
 
-			$start   = $start_position;
-			$end     = $end_position;
+			$start   = ( isset( $start_position ) ? (int) $start_position : 0 );
+			$end     = ( isset( $end_position ) ? (int) $end_position : ( count( $tokens ) - 1 ) );
 			$reverse = false;
 
-			if ( $end_position < $start_position ) {
+			if ( $end < $start ) {
 				$reverse = true;
-				$start   = $end_position;
-				$end     = $start_position;
+				$tmp   = $start;
+				$start = $end;
+				$end   = $tmp;
+				unset( $tmp );
 			}
 
 			print '<table>
