@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This is an example class
+ * This is an example class for test purposes
  * @package CamelCase
  */
 class CamelCase {
@@ -12,8 +12,8 @@ class CamelCase {
 
 
 	/**
-	 * @param      $property1
-	 * @param null $property2
+	 * @param   array       $property1
+	 * @param   array|null  $property2
 	 */
 	public function __construct( $property1, $property2 = null ) {
 		$this->property1 = (array) $property1;

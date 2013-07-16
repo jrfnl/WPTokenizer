@@ -1,5 +1,7 @@
 <?php
-if( 1 == 1 ) { print 1; }
+if ( 1 == 1 ) {
+	print 1;
+}
 /*
 	Plugin Name: Health Check
 	Plugin URI: http://wordpress.org/extend/plugins/health-check/

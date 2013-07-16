@@ -52,7 +52,7 @@ class WPTokenizerTestsGetPluginInfo extends PHPUnit_Framework_TestCase {
 
 	const TEST_FILE_3 = 'casePluginInfoNotFirst.php';
 
-	const TEST_DIR    = 'PluginInfo';
+	const TEST_DIR = 'PluginInfo';
 
 	/**
 	 * @var		array	$tokenizer	Hold an instance of the tokenizer class
@@ -77,7 +77,7 @@ class WPTokenizerTestsGetPluginInfo extends PHPUnit_Framework_TestCase {
 	 * @covers WPTokenizer::get_plugin_name()
 	 */
 	public function test_get_plugin_name() {
-		$this->tokens    = $this->tokenizer->get_tokens( TEST_FILES_PATH . self::TEST_FILE_1 );
+		$this->tokens = $this->tokenizer->get_tokens( TEST_FILES_PATH . self::TEST_FILE_1 );
 		$this->assertEquals( 'Health Check', $this->tokenizer->get_plugin_name( $this->tokens ) );
 
 	}
@@ -89,7 +89,7 @@ class WPTokenizerTestsGetPluginInfo extends PHPUnit_Framework_TestCase {
 	 * @covers WPTokenizer::get_plugin_name()
 	 */
 	public function test_get_plugin_name_null() {
-		$this->tokens    = $this->tokenizer->get_tokens( TEST_FILES_PATH . self::TEST_FILE_2 );
+		$this->tokens = $this->tokenizer->get_tokens( TEST_FILES_PATH . self::TEST_FILE_2 );
 		$this->assertNull( $this->tokenizer->get_plugin_name( $this->tokens ) );
 	}
 
@@ -100,7 +100,7 @@ class WPTokenizerTestsGetPluginInfo extends PHPUnit_Framework_TestCase {
 	 * @covers WPTokenizer::get_plugin_name()
 	 */
 	public function test_get_plugin_name_not_first() {
-		$this->tokens    = $this->tokenizer->get_tokens( TEST_FILES_PATH . self::TEST_FILE_3 );
+		$this->tokens = $this->tokenizer->get_tokens( TEST_FILES_PATH . self::TEST_FILE_3 );
 		$this->assertNull( $this->tokenizer->get_plugin_name( $this->tokens ) );
 	}
 
@@ -111,7 +111,7 @@ class WPTokenizerTestsGetPluginInfo extends PHPUnit_Framework_TestCase {
 	 * @covers WPTokenizer::get_plugin_name()
 	 */
 	public function test_get_plugin_name_ambiguous() {
-		$files    = $this->tokenizer->get_files( TEST_FILES_PATH . self::TEST_DIR . DIRECTORY_SEPARATOR );
+		$files = $this->tokenizer->get_files( TEST_FILES_PATH . self::TEST_DIR . DIRECTORY_SEPARATOR );
 		foreach ( $files as $file ) {
 			$tokens            = $this->tokenizer->get_tokens( TEST_FILES_PATH . $file );
 			$this->plugin_name = $this->tokenizer->get_plugin_name( $tokens, $this->plugin_name );
