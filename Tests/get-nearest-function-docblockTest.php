@@ -66,7 +66,7 @@ class WPTokenizerTestsGetNearestFunctionDocblock extends PHPUnit_Framework_TestC
 	 */
 	public function test_get_nearest_function_docblock() {
 
-		$keys = $this->tokenizer->filter_on_value( $this->tokens, array( 'do_action' ) );
+		$keys     = $this->tokenizer->filter_on_value( $this->tokens, array( 'do_action' ) );
 		$expected = '/**
 		 * Test method
 		 *
@@ -76,9 +76,23 @@ class WPTokenizerTestsGetNearestFunctionDocblock extends PHPUnit_Framework_TestC
 		 * @param 	string	$param
 		 * @return string
 		 */';
-
 		foreach ( $keys as $key => $object ) {
 			$this->assertEquals( $expected, $this->tokenizer->get_nearest_function_docblock( $this->tokens, $key ) );
+		}
+	}
+
+
+	/**
+	 * @covers WPTokenizer::strip_comment_markers()
+	 */
+	public function test_strip_comment_markers() {
+
+		$keys     = $this->tokenizer->filter_on_value( $this->tokens, array( 'do_action' ) );
+		$expected = 'Test method' . "\n"  . "\n" . '@api A description for the action' . "\n" . '@api string	A description of the parameters passed' . "\n"  . "\n" . '@param string	$param' . "\n" . '@return string';
+
+		foreach ( $keys as $key => $object ) {
+			$comment = $this->tokenizer->get_nearest_function_docblock( $this->tokens, $key );
+			$this->assertEquals( $expected, $this->tokenizer->strip_comment_markers( $comment ) );
 		}
 	}
 
