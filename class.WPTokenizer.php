@@ -42,9 +42,9 @@ if ( !class_exists( 'WPTokenizer' ) ) {
 		const VERSION = '1.0';
 
 		/**
-		 * @var		array	$not		Which comment tags to remove from parse comment results
+		 * @var		array	$default_not		Which comment tags to remove from parse comment results
 		 */
-		protected $default_not = array(
+		private $default_not = array(
 			'internal',
 			'ignore',
 		);
@@ -92,8 +92,7 @@ if ( !class_exists( 'WPTokenizer' ) ) {
 
 
 		/**
-		 * Change the value of the protected $default_not property which determines which
-		 * comment properties to exclude from being returned in a parsed comment.
+		 * Change the value of the $default_not property.
 		 *
 		 * @param   array|string|null    $not
 		 * @return  bool                 Whether the property was changed
@@ -118,19 +117,45 @@ if ( !class_exists( 'WPTokenizer' ) ) {
 
 
 		/**
+		 * Change the value of the $extensions property.
+		 *
+		 * @param   array|string|null    $extensions
+		 * @return  void
+		 */
+		public function set_extensions( $extensions ) {
+			if ( !isset( $extensions ) ) {
+				$this->extensions = null;
+			}
+			else {
+				// No need to validate as validation is done in DirectoryWalker
+				$this->extensions = $extensions;
+			}
+		}
+
+
+		/**
 		 * Retrieve the (cached) file list for path
 		 *
-		 * @param	string			$path       Directory path
-		 * @param	bool			$recursive  Defaults to true
-		 * @param	array|string	$exts       Defaults to null (=don't filter on exts)
-		 * @return	array			File list
+		 * @param	string				$path       Directory path
+		 * @param	bool				$recursive  Defaults to true
+		 * @param	array|string|null	$exts       Defaults to $this->extensions (=php)
+		 * @return	array				File list
 		 */
 		public function get_files( $path, $recursive = true, $exts = null ) {
 			if ( !isset( $exts ) ) {
 				$exts = $this->extensions;
 			}
+
 			include_once( 'include/DirectoryWalker/class.DirectoryWalker.php' );
-			return DirectoryWalker::get_file_list( $path, $recursive, $exts );
+
+			$list = DirectoryWalker::get_file_list( $path, $recursive, $exts );
+
+			if ( function_exists( 'apply_filters' ) ) {
+				return apply_filters( 'wptokenizer_filelist', $list );
+			}
+			else {
+				return $list;
+			}
 		}
 
 		/**
@@ -473,7 +498,7 @@ link_images.php’
 		 *
 		 * @param	array			$tokens		Array of token objects
 		 * @param	int				$key		Key of the token for which we're trying to get the comment
-		 * @return	string
+		 * @return	string|null
 		 */
 		public function get_comment_above_line( $tokens, $key ) {
 
@@ -513,7 +538,7 @@ link_images.php’
 
 					for ( $j = $i - 1; $j; $j-- ) {
 						if ( !isset( $tokens[$j] ) || $comment_line_number !== $tokens[$j]->getLine() ) {
-							$comment[] = trim( $tokens[$i]->__toString() ); // capture the comment
+							$comment[] = $tokens[$i]->__toString(); // capture the comment
 							break 1;
 						}
 						else if ( $tokens[$j] instanceof PHP_Token_WHITESPACE ) {
@@ -580,11 +605,12 @@ link_images.php’
 
 			if ( isset( $comment ) && is_array( $comment ) && count( $comment ) > 0 ) {
 				$comment = array_reverse( $comment );
-				$comment = implode( "\n\r", $comment );
+				$comment = array_map( 'trim', $comment );
+				$comment = implode( "\n", $comment );
 				return $comment;
 			}
 			else {
-				return false;
+				return null;
 			}
 
 				// Isset ?
@@ -789,18 +815,23 @@ else {
 */
 
 		/**
-		 * @todo Have a really good look at this function !!!
+		 * Strip all comment markings and extra whitespace from a comment string
+		 *
+		 * Strips for each line of the comment:
+		 * - '/*[*]', '//', '#', '*' from the beginning of a line
+		 * - '*\/' from the end of a line
+		 * - spaces and tabs from the beginning of a line
+		 * - carriage returns (\r) from the end of a line
+		 * - merges any combination of spaces and tabs into one space
+		 *
 		 * @param   string  $comment
 		 * @return  string
 		 */
 		public function strip_comment_markers( $comment ) {
-			static $search  = array( '`(?:^(/\*+[ \t]*)|([ \t]*\*+/)$|^([ \t]*\*[\s]*)|^(//[ \t]*)|^(#[ \t]*))`m', '`([ \t\r]{2,})`' );
-			static $replace = array( '', ' ' );
+			static $search  = array( '`(^[\s]*(/\*+[\s]*(?:\*[ \t]*)?)|[\s]*(\*+/)[\s]*$|^[\s]*(\*+[ \t]*)|^[\s]*(/{2,})[\s]*|^[\s]*(#+)[\s]*)`m', '`^([ \t]+)`m', '`(\r)+[\n]?$`m', '`([ \t\r]{2,})`' );
+			static $replace = array( '', '', '', ' ' );
 
 			// Parse out all the line endings and comment delimiters
-			preg_match_all( $search[0], trim( $comment ), $matches );
-pr_var( $matches[0], 'matches', true );
-
 			$comment = trim( preg_replace( $search, $replace, trim( $comment ) ) );
 			return $comment;
 		}
@@ -829,15 +860,8 @@ pr_var( $matches[0], 'matches', true );
 				return false;
 			}
 
-//			static $search = array( '`(?:^(/\*+)|(\*/)$|[\n\r][ \t]+(\*)[\s]|^(//)|^(#))`', '`([ \t\r]{2,})`' );
-/*			static $replace = array( '', ' ' );
-
-			// Parse out all the line endings and comment delimiters
-			$string = trim( preg_replace( $search, $replace, trim( $string ) ) );
-*/
-pr_var( $string, 'string before stripping', true );
 			$string = $this->strip_comment_markers( $string );
-pr_var( $string, 'string after stripping', true );
+
 			// Match the individual comment parts
 			$found = preg_match_all( '`(?:@([a-z-]+)\s+)?([^@]+)`', $string, $matches, PREG_SET_ORDER );
 
